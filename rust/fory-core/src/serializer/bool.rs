@@ -32,6 +32,11 @@ impl Serializer for bool {
         Ok(context.reader.read_u8() == 1)
     }
 
+    fn fory_read_data_into(context: &mut ReadContext, _is_field: bool, output: &mut Self) -> Result<(), Error> {
+        *output = context.reader.read_u8() == 1;
+        Ok(())
+    }
+
     fn fory_reserved_space() -> usize {
         mem::size_of::<i32>()
     }

@@ -72,6 +72,26 @@ impl<T: Serializer + ForyDefault> Serializer for Vec<T> {
         }
     }
 
+    fn fory_read_data_into(
+        context: &mut ReadContext,
+        _is_field: bool,
+        output: &mut Self,
+    ) -> Result<(), Error> {
+        match check_primitive::<T>() {
+            Some(_) => {
+                // For primitive types, we need to replace the entire vector
+                *output = primitive_list::fory_read_data(context)?;
+            }
+            None => {
+                // For non-primitive types, we can clear and refill to reuse capacity
+                output.clear();
+                let new_elements: Vec<T> = read_collection(context)?;
+                output.extend(new_elements);
+            }
+        }
+        Ok(())
+    }
+
     fn fory_read_type_info(context: &mut ReadContext, is_field: bool) {
         match check_primitive::<T>() {
             Some(type_id) => primitive_list::fory_read_type_info(context, is_field, type_id),

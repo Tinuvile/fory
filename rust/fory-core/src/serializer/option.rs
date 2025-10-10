@@ -26,6 +26,18 @@ impl<T: Serializer + ForyDefault> Serializer for Option<T> {
         Ok(Some(T::fory_read_data(context, is_field)?))
     }
 
+    fn fory_read_data_into(context: &mut ReadContext, is_field: bool, output: &mut Self) -> Result<(), Error> {
+        match output {
+            Some(ref mut inner) => {
+                T::fory_read_data_into(context, is_field, inner)?;
+            }
+            None => {
+                *output = Some(T::fory_read_data(context, is_field)?);
+            }
+        }
+        Ok(())
+    }
+
     fn fory_read_type_info(context: &mut ReadContext, is_field: bool) {
         T::fory_read_type_info(context, is_field);
     }

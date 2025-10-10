@@ -391,6 +391,60 @@ impl Fory {
         result
     }
 
+    /// Deserializes data from a byte slice directly into an existing value of type `T`.
+    ///
+    /// This method provides in-place deserialization, avoiding object creation and copying
+    /// for better performance, especially beneficial for large structures or high-frequency
+    /// deserialization scenarios.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` - The target type to deserialize into. Must implement `Serializer` and `ForyDefault`.
+    ///
+    /// # Arguments
+    ///
+    /// * `bf` - The byte slice containing the serialized data.
+    /// * `output` - A mutable reference to the target object to populate.
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(())` - Success.
+    /// * `Err(Error)` - An error if deserialization fails (e.g., invalid format, type mismatch).
+    ///
+    /// # Performance Benefits
+    ///
+    /// - **Zero-copy deserialization**: Directly fills the provided object, avoiding RVO dependency
+    /// - **Memory efficiency**: Reuses existing object allocation
+    /// - **No temporary copies**: Eliminates intermediate object creation
+    ///
+    /// # Examples
+    ///
+    /// ```rust, ignore
+    /// use fory::Fory;
+    /// use fory::ForyObject;
+    ///
+    /// #[derive(ForyObject, Default)]
+    /// struct Point { x: i32, y: i32 }
+    ///
+    /// let fory = Fory::default();
+    /// let point = Point { x: 10, y: 20 };
+    /// let bytes = fory.serialize(&point);
+    /// 
+    /// let mut target = Point::default();
+    /// fory.deserialize_into(&bytes, &mut target).unwrap();
+    /// assert_eq!(target.x, 10);
+    /// assert_eq!(target.y, 20);
+    /// ```
+    pub fn deserialize_into<T: Serializer + ForyDefault>(&self, bf: &[u8], output: &mut T) -> Result<(), Error> {
+        let reader = Reader::new(bf);
+        let mut context = ReadContext::new(self, reader, self.max_dyn_depth);
+        let result = self.deserialize_into_with_context(&mut context, output);
+        if result.is_ok() {
+            assert_eq!(context.reader.slice_after_cursor().len(), 0);
+        }
+        result
+    }
+
     pub fn deserialize_with_context<T: Serializer + ForyDefault>(
         &self,
         context: &mut ReadContext,
@@ -407,6 +461,31 @@ impl Fory {
             }
         }
         let result = <T as Serializer>::fory_read(context, false);
+        if bytes_to_skip > 0 {
+            context.reader.skip(bytes_to_skip as u32);
+        }
+        context.ref_reader.resolve_callbacks();
+        result
+    }
+
+    pub fn deserialize_into_with_context<T: Serializer + ForyDefault>(
+        &self,
+        context: &mut ReadContext,
+        output: &mut T,
+    ) -> Result<(), Error> {
+        let is_none = self.read_head(&mut context.reader)?;
+        if is_none {
+            *output = T::fory_default();
+            return Ok(());
+        }
+        let mut bytes_to_skip = 0;
+        if self.mode == Mode::Compatible {
+            let meta_offset = context.reader.read_i32();
+            if meta_offset != -1 {
+                bytes_to_skip = context.load_meta(meta_offset as usize);
+            }
+        }
+        let result = <T as Serializer>::fory_read_into(context, false, output);
         if bytes_to_skip > 0 {
             context.reader.skip(bytes_to_skip as u32);
         }
