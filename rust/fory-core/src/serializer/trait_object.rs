@@ -255,6 +255,16 @@ macro_rules! register_trait_type {
                 panic!("fory_read_data should not be called directly on polymorphic Box<dyn {}> trait object", stringify!($trait_name));
             }
 
+            fn fory_read_data_into(_context: &mut $crate::resolver::context::ReadContext, _is_field: bool, _output: &mut Self) -> Result<(), $crate::error::Error>
+            where
+                Self: Sized + $crate::serializer::ForyDefault,
+            {
+                // This should not be called for polymorphic types like Box<dyn Trait>
+                // Polymorphic types cannot be deserialized into existing instances because
+                // the concrete type may differ from what's already in the output
+                panic!("fory_read_data_into should not be called directly on polymorphic Box<dyn {}> trait object. Use fory_read instead or deserialize to concrete types.", stringify!($trait_name));
+            }
+
             fn fory_get_type_id(_fory: &$crate::fory::Fory) -> u32 {
                 $crate::types::TypeId::STRUCT as u32
             }
@@ -491,6 +501,16 @@ macro_rules! impl_smart_pointer_serializer {
                 )
             }
 
+            fn fory_read_data_into(_context: &mut $crate::resolver::context::ReadContext, _is_field: bool, _output: &mut Self) -> Result<(), $crate::error::Error>
+            where
+                Self: Sized + $crate::serializer::ForyDefault,
+            {
+                // This should not be called for polymorphic smart pointer wrappers
+                // Polymorphic types cannot be deserialized into existing instances because
+                // the concrete type may differ from what's already in the output
+                panic!("fory_read_data_into should not be called directly on polymorphic {} wrapper for trait {}. Use fory_read instead or deserialize to concrete types.", stringify!($wrapper_name), stringify!($trait_name));
+            }
+
             fn fory_get_type_id(_fory: &$crate::fory::Fory) -> u32 {
                 $crate::types::TypeId::STRUCT as u32
             }
@@ -615,6 +635,20 @@ impl Serializer for Box<dyn Serializer> {
     }
     fn fory_read_data(_context: &mut ReadContext, _is_field: bool) -> Result<Self, Error> {
         panic!("fory_read_data should not be called directly on Box<dyn Serializer>");
+    }
+
+    fn fory_read_data_into(
+        _context: &mut ReadContext,
+        _is_field: bool,
+        _output: &mut Self,
+    ) -> Result<(), Error>
+    where
+        Self: Sized + ForyDefault,
+    {
+        // This should not be called for polymorphic types like Box<dyn Serializer>
+        // Polymorphic types cannot be deserialized into existing instances because
+        // the concrete type may differ from what's already in the output
+        panic!("fory_read_data_into should not be called directly on Box<dyn Serializer>. Use fory_read instead or deserialize to concrete types.");
     }
 }
 

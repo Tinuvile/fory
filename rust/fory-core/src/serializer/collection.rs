@@ -132,3 +132,72 @@ where
             .collect::<Result<C, Error>>()
     }
 }
+
+/// Read collection data directly into an existing collection, avoiding allocation.
+/// This is optimized for reusing collections by clearing and refilling them.
+pub fn read_collection_into<C, T>(context: &mut ReadContext, output: &mut C) -> Result<(), Error>
+where
+    T: Serializer + ForyDefault,
+    C: Extend<T> + Clear,
+{
+    let len = context.reader.read_varuint32();
+
+    // Clear existing collection but retain capacity
+    output.clear();
+
+    if len == 0 {
+        return Ok(());
+    }
+
+    let header = context.reader.read_u8();
+    let declared = (header & DECL_ELEMENT_TYPE) != 0;
+    T::fory_read_type_info(context, declared);
+    let has_null = (header & HAS_NULL) != 0;
+    let is_same_type = (header & IS_SAME_TYPE) != 0;
+
+    if T::fory_is_polymorphic() || T::fory_is_shared_ref() {
+        let elements = (0..len)
+            .map(|_| T::fory_read(context, declared))
+            .collect::<Result<Vec<T>, Error>>()?;
+        output.extend(elements);
+    } else {
+        let skip_ref_flag = is_same_type && !has_null;
+        let elements = (0..len)
+            .map(|_| crate::serializer::read_ref_info_data(context, declared, skip_ref_flag, true))
+            .collect::<Result<Vec<T>, Error>>()?;
+        output.extend(elements);
+    }
+
+    Ok(())
+}
+
+/// Trait for collections that can be cleared while retaining their capacity.
+/// This is used by `read_collection_into` to optimize memory usage.
+pub trait Clear {
+    fn clear(&mut self);
+}
+
+// Implement Clear for standard library collections
+impl<T> Clear for Vec<T> {
+    fn clear(&mut self) {
+        self.clear();
+    }
+}
+
+impl<T> Clear for std::collections::HashSet<T> {
+    fn clear(&mut self) {
+        self.clear();
+    }
+}
+
+impl<K, V> Clear for std::collections::HashMap<K, V> {
+    fn clear(&mut self) {
+        self.clear();
+    }
+}
+
+impl<K, V> Clear for std::collections::BTreeMap<K, V> {
+    fn clear(&mut self) {
+        self.clear();
+    }
+}

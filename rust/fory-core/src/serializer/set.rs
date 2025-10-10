@@ -20,7 +20,8 @@ use crate::fory::Fory;
 use crate::resolver::context::ReadContext;
 use crate::resolver::context::WriteContext;
 use crate::serializer::collection::{
-    read_collection, read_collection_type_info, write_collection, write_collection_type_info,
+    read_collection, read_collection_into, read_collection_type_info, write_collection,
+    write_collection_type_info,
 };
 
 use crate::serializer::{ForyDefault, Serializer};
@@ -39,6 +40,17 @@ impl<T: Serializer + ForyDefault + Eq + std::hash::Hash> Serializer for HashSet<
 
     fn fory_read_data(context: &mut ReadContext, _is_field: bool) -> Result<Self, Error> {
         read_collection(context)
+    }
+
+    fn fory_read_data_into(
+        context: &mut ReadContext,
+        _is_field: bool,
+        output: &mut Self,
+    ) -> Result<(), Error>
+    where
+        Self: Sized + ForyDefault,
+    {
+        read_collection_into(context, output)
     }
 
     fn fory_read_type_info(context: &mut ReadContext, is_field: bool) {

@@ -54,6 +54,19 @@ impl<T: Serializer + ForyDefault> Serializer for RefCell<T> {
         Ok(RefCell::new(T::fory_read_data(context, is_field)?))
     }
 
+    fn fory_read_data_into(
+        context: &mut ReadContext,
+        is_field: bool,
+        output: &mut Self,
+    ) -> Result<(), Error>
+    where
+        Self: Sized + ForyDefault,
+    {
+        // Borrow mutably and delegate to inner type's read_data_into
+        let mut borrowed = output.borrow_mut();
+        T::fory_read_data_into(context, is_field, &mut *borrowed)
+    }
+
     fn fory_read_type_info(context: &mut ReadContext, is_field: bool) {
         T::fory_read_type_info(context, is_field);
     }

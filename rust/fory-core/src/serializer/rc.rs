@@ -77,6 +77,18 @@ impl<T: Serializer + ForyDefault + 'static> Serializer for Rc<T> {
         Self::fory_read(context, is_field)
     }
 
+    fn fory_read_data_into(context: &mut ReadContext, is_field: bool, output: &mut Self) -> Result<(), Error>
+    where
+        Self: Sized + ForyDefault,
+    {
+        // For Rc<T>, we cannot modify the inner value directly due to reference counting.
+        // The most efficient approach is to deserialize a new Rc and replace the entire output.
+        // This still provides some benefit over the default implementation by avoiding
+        // intermediate stack allocation in some cases.
+        *output = Self::fory_read(context, is_field)?;
+        Ok(())
+    }
+
     fn fory_read_type_info(context: &mut ReadContext, is_field: bool) {
         T::fory_read_type_info(context, is_field);
     }

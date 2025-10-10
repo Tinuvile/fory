@@ -73,6 +73,16 @@ impl Serializer for Box<dyn Any> {
         deserialize_any_box(context)
     }
 
+    fn fory_read_data_into(_context: &mut ReadContext, _is_field: bool, _output: &mut Self) -> Result<(), Error>
+    where
+        Self: Sized + ForyDefault,
+    {
+        // This should not be called for polymorphic types like Box<dyn Any>
+        // Polymorphic types cannot be deserialized into existing instances because
+        // the concrete type may differ from what's already in the output
+        panic!("fory_read_data_into should not be called directly on polymorphic Box<dyn Any>. Use fory_read instead or deserialize to concrete types.");
+    }
+
     fn fory_get_type_id(_fory: &Fory) -> u32 {
         panic!("Box<dyn Any> has no static type ID - use fory_type_id_dyn")
     }
@@ -160,6 +170,16 @@ impl Serializer for Rc<dyn Any> {
         Self::fory_read(context, is_field)
     }
 
+    fn fory_read_data_into(_context: &mut ReadContext, _is_field: bool, _output: &mut Self) -> Result<(), Error>
+    where
+        Self: Sized + ForyDefault,
+    {
+        // This should not be called for polymorphic types like Rc<dyn Any>
+        // Polymorphic types cannot be deserialized into existing instances because
+        // the concrete type may differ from what's already in the output
+        panic!("fory_read_data_into should not be called directly on polymorphic Rc<dyn Any>. Use fory_read instead or deserialize to concrete types.");
+    }
+
     fn fory_get_type_id(_fory: &Fory) -> u32 {
         panic!("Rc<dyn Any> has no static type ID - use fory_type_id_dyn")
     }
@@ -245,6 +265,16 @@ impl Serializer for Arc<dyn Any> {
 
     fn fory_read_data(context: &mut ReadContext, is_field: bool) -> Result<Self, Error> {
         Self::fory_read(context, is_field)
+    }
+
+    fn fory_read_data_into(_context: &mut ReadContext, _is_field: bool, _output: &mut Self) -> Result<(), Error>
+    where
+        Self: Sized + ForyDefault,
+    {
+        // This should not be called for polymorphic types like Arc<dyn Any>
+        // Polymorphic types cannot be deserialized into existing instances because
+        // the concrete type may differ from what's already in the output
+        panic!("fory_read_data_into should not be called directly on polymorphic Arc<dyn Any>. Use fory_read instead or deserialize to concrete types.");
     }
 
     fn fory_get_type_id(_fory: &Fory) -> u32 {

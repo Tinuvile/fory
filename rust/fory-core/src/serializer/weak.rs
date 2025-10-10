@@ -372,6 +372,17 @@ impl<T: Serializer + ForyDefault + 'static> Serializer for RcWeak<T> {
         Self::fory_read(context, is_field)
     }
 
+    fn fory_read_data_into(context: &mut ReadContext, is_field: bool, output: &mut Self) -> Result<(), Error>
+    where
+        Self: Sized + ForyDefault,
+    {
+        // For RcWeak<T>, the deserialization logic is complex due to reference tracking
+        // and potential forward references. The most efficient approach is to deserialize
+        // a new RcWeak and replace the entire output, preserving the shared UnsafeCell semantics.
+        *output = Self::fory_read(context, is_field)?;
+        Ok(())
+    }
+
     fn fory_read_type_info(context: &mut ReadContext, is_field: bool) {
         T::fory_read_type_info(context, is_field);
     }
@@ -471,6 +482,17 @@ impl<T: Serializer + ForyDefault + Send + Sync + 'static> Serializer for ArcWeak
     }
     fn fory_read_data(context: &mut ReadContext, is_field: bool) -> Result<Self, Error> {
         Self::fory_read(context, is_field)
+    }
+
+    fn fory_read_data_into(context: &mut ReadContext, is_field: bool, output: &mut Self) -> Result<(), Error>
+    where
+        Self: Sized + ForyDefault,
+    {
+        // For ArcWeak<T>, the deserialization logic is complex due to reference tracking
+        // and potential forward references. The most efficient approach is to deserialize
+        // a new ArcWeak and replace the entire output, preserving the shared UnsafeCell semantics.
+        *output = Self::fory_read(context, is_field)?;
+        Ok(())
     }
 
     fn fory_read_type_info(context: &mut ReadContext, is_field: bool) {

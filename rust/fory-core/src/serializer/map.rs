@@ -253,9 +253,7 @@ impl<K: Serializer + ForyDefault + Eq + std::hash::Hash, V: Serializer + ForyDef
                 continue;
             }
             let key_declared = (header & DECL_KEY_TYPE) != 0;
-            let _key_tracking_ref = (header & TRACKING_KEY_REF) != 0;
             let value_declared = (header & DECL_VALUE_TYPE) != 0;
-            let _value_tracking_ref = (header & TRACKING_VALUE_REF) != 0;
             if header & KEY_NULL != 0 {
                 let skip_ref_flag = if value_declared {
                     crate::serializer::get_skip_ref_flag::<V>(context.get_fory())
@@ -282,7 +280,7 @@ impl<K: Serializer + ForyDefault + Eq + std::hash::Hash, V: Serializer + ForyDef
             K::fory_read_type_info(context, key_declared);
             V::fory_read_type_info(context, value_declared);
             assert!(len_counter + chunk_size as u32 <= len);
-            for _ in (0..chunk_size).enumerate() {
+            for _ in 0..chunk_size {
                 let key = if K::fory_is_polymorphic() {
                     K::fory_read(context, key_declared)?
                 } else {
@@ -397,6 +395,77 @@ impl<K: Serializer + ForyDefault + Ord, V: Serializer + ForyDefault> Serializer 
             len_counter += chunk_size as u32;
         }
         Ok(map)
+    }
+
+    fn fory_read_data_into(
+        context: &mut ReadContext,
+        _is_field: bool,
+        output: &mut Self,
+    ) -> Result<(), Error> {
+        let len = context.reader.read_varuint32();
+
+        // Clear existing map
+        output.clear();
+
+        if len == 0 {
+            return Ok(());
+        }
+
+        let mut len_counter = 0;
+        loop {
+            if len_counter == len {
+                break;
+            }
+            let header = context.reader.read_u8();
+            if header & KEY_NULL != 0 && header & VALUE_NULL != 0 {
+                output.insert(K::fory_default(), V::fory_default());
+                len_counter += 1;
+                continue;
+            }
+            let key_declared = (header & DECL_KEY_TYPE) != 0;
+            let value_declared = (header & DECL_VALUE_TYPE) != 0;
+            if header & KEY_NULL != 0 {
+                let skip_ref_flag = if value_declared {
+                    crate::serializer::get_skip_ref_flag::<V>(context.get_fory())
+                } else {
+                    false
+                };
+                let value = read_ref_info_data(context, value_declared, skip_ref_flag, false)?;
+                output.insert(K::fory_default(), value);
+                len_counter += 1;
+                continue;
+            }
+            if header & VALUE_NULL != 0 {
+                let skip_ref_flag = if key_declared {
+                    crate::serializer::get_skip_ref_flag::<K>(context.get_fory())
+                } else {
+                    false
+                };
+                let key = read_ref_info_data(context, key_declared, skip_ref_flag, false)?;
+                output.insert(key, V::fory_default());
+                len_counter += 1;
+                continue;
+            }
+            let chunk_size = context.reader.read_u8();
+            K::fory_read_type_info(context, key_declared);
+            V::fory_read_type_info(context, value_declared);
+            assert!(len_counter + chunk_size as u32 <= len);
+            for _ in 0..chunk_size {
+                let key = if K::fory_is_polymorphic() {
+                    K::fory_read(context, key_declared)?
+                } else {
+                    read_ref_info_data(context, key_declared, true, true)?
+                };
+                let value = if V::fory_is_polymorphic() {
+                    V::fory_read(context, value_declared)?
+                } else {
+                    read_ref_info_data(context, value_declared, true, true)?
+                };
+                output.insert(key, value);
+            }
+            len_counter += chunk_size as u32;
+        }
+        Ok(())
     }
 
     fn fory_reserved_space() -> usize {

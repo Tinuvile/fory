@@ -27,7 +27,8 @@ use std::collections::{LinkedList, VecDeque};
 use std::mem;
 
 use super::collection::{
-    read_collection, read_collection_type_info, write_collection, write_collection_type_info,
+    read_collection, read_collection_into, read_collection_type_info, write_collection,
+    write_collection_type_info,
 };
 
 fn check_primitive<T: 'static>() -> Option<TypeId> {
@@ -84,10 +85,8 @@ impl<T: Serializer + ForyDefault> Serializer for Vec<T> {
                 *output = primitive_list::fory_read_data(context)?;
             }
             None => {
-                // For non-primitive types, we can clear and refill to reuse capacity
-                output.clear();
-                let new_elements: Vec<T> = read_collection(context)?;
-                output.extend(new_elements);
+                // For non-primitive types, use the generic collection reader
+                read_collection_into(context, output)?;
             }
         }
         Ok(())
